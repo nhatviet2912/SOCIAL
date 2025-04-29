@@ -11,10 +11,10 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 
-
 builder.Services.AddControllers();
 
 var app = builder.Build();
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -24,8 +24,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
-app.UseValidationExceptionHandling();
 
+app.ConfigureExceptionHandler(logger);
+app.UseValidationExceptionHandling();
 app.MapControllers();
 
 app.UseHttpsRedirection();

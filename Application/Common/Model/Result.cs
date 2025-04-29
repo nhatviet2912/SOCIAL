@@ -1,4 +1,5 @@
 ﻿namespace Application.Common.Model;
+using System;
 
 public class Result<T>
 {
@@ -11,6 +12,8 @@ public class Result<T>
     //public List<ValidationResult> ValidationErrors { get; set; }
 
     public Exception Exception { get; set; }
+    
+    public int Code { get; set; }
         
     #region Non Async Methods 
 
@@ -42,13 +45,14 @@ public class Result<T>
         };
     }
 
-    public static Result<T> Success(T data, string message)
+    public static Result<T> Success(T data, string message, int code)
     {
         return new Result<T>
         {
             Succeeded = true,
             Messages = new List<string> { message },
             Data = data,
+            Code = code
         };
     }
 
@@ -91,7 +95,7 @@ public class Result<T>
         };
     }
 
-    public static Result<T> Failure(T data, string message)
+    public static Result<T> Failure(T data, string message, int code)
     {
         return new Result<T>
         {
@@ -101,13 +105,14 @@ public class Result<T>
         };
     }
 
-    public static Result<T> Failure(T data, List<string> messages)
+    public static Result<T> Failure(T data, List<string> messages, int code)
     {
         return new Result<T>
         {
             Succeeded = false,
             Messages = messages,
-            Data = data
+            Data = data,
+            Code = code
         };
     }
 
@@ -143,9 +148,9 @@ public class Result<T>
         return Task.FromResult(Success(data));
     }
 
-    public static Task<Result<T>> SuccessAsync(T data, string message)
+    public static Task<Result<T>> SuccessAsync(T data, string message, int code)
     {
-        return Task.FromResult(Success(data, message));
+        return Task.FromResult(Success(data, message, code));
     }
 
     #endregion
@@ -172,14 +177,14 @@ public class Result<T>
         return Task.FromResult(Failure(data));
     }
 
-    public static Task<Result<T>> FailureAsync(T data, string message)
+    public static Task<Result<T>> FailureAsync(T data, string message, int code)
     {
-        return Task.FromResult(Failure(data, message));
+        return Task.FromResult(Failure(data, message, code));
     }
 
-    public static Task<Result<T>> FailureAsync(T data, List<string> messages)
+    public static Task<Result<T>> FailureAsync(T data, List<string> messages, int code)
     {
-        return Task.FromResult(Failure(data, messages));
+        return Task.FromResult(Failure(data, messages, code));
     }
 
     public static Task<Result<T>> FailureAsync(Exception exception)

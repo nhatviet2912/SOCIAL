@@ -22,4 +22,13 @@ public class AuthController : BaseController
         var result = await _identityService.CreateUserAsync(request);
         return Ok(result);
     }
+    
+    [HttpGet("GetAllUsers")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetAllUsers()
+    {
+        var result = await _identityService.GetAllUsersAsync();
+        return Ok(result);
+    }
 }

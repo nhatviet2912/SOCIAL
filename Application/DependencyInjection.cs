@@ -1,4 +1,5 @@
-﻿using Application.Common.Interfaces.Service;
+﻿using System.Reflection;
+using Application.Common.Interfaces.Service;
 using Application.Service;
 using Application.Validators.AuthValidator;
 using FluentValidation;
@@ -15,6 +16,13 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssemblyContaining<RegisterValidator>();
         services.AddFluentValidationAutoValidation();
+        services.AddAutoMapper();
+        
         return services;
+    }
+    
+    private static void AddAutoMapper(this IServiceCollection services)
+    {
+        services.AddAutoMapper(Assembly.GetExecutingAssembly());
     }
 }
