@@ -49,9 +49,9 @@ public static class ExceptionMiddleware
                         context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
                         title = ResponseCode.INTERNAL_ERROR;
                         errorCode = (int)HttpStatusCode.InternalServerError;
-                        errorMessage = "An error has occurred.";
+                        errorMessage = ErrorMessageResponse.AN_ERROR;
                     }
-                    await context.Response.WriteAsync(new Error(title, errorCode, errorMessage, traceId).ToString());
+                    await context.Response.WriteAsync(new Error(title, errorCode, errorMessage, null, traceId).ToString());
                     logger.LogError("ErrorId:{errorId} Exception:{contextFeature.Error}", traceId,
                         contextFeature.Error);
                 }
