@@ -1,7 +1,8 @@
 ﻿using Application.Common.Exception;
 using Application.Common.Interfaces.Service;
 using Application.Common.Model;
-using Application.DTO.Register;
+using Application.DTO.Request.Login;
+using Application.DTO.Request.Register;
 using Application.DTO.Response.User;
 using AutoMapper;
 using Domain.Constants;
@@ -60,5 +61,22 @@ public class IdentityService : IIdentityService
         var users = await _userManager.Users.ToListAsync();
         var response = _mapper.Map<List<UserResponse>>(users);
         return await Result<List<UserResponse>>.SuccessAsync(response, ResponseCode.SUCCESS, StatusCodes.Status200OK);
+    }
+
+    public async Task<AuthResponse> LoginAsync(LoginRequest request)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email!);
+        if (user == null) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
+        if (user.LockoutEnabled) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_LOCKED);
+        var password = await _userManager.CheckPasswordAsync(user, request.Password!);
+
+        if (!password) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.PASSWORD_INVALID);
+
+        // var gêểênr
+
+    }
+
+    private string GenerateJwtAsync () {
+        
     }
 }
