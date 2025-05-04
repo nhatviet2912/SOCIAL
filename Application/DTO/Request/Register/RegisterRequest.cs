@@ -1,4 +1,4 @@
-﻿namespace Application.DTO.Register;
+﻿namespace Application.DTO.Request.Register;
 
 public class RegisterRequest
 {
