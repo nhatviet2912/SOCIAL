@@ -1,10 +1,13 @@
 ﻿
 using Domain.Entities;
 using Infrastructure.Data;
+using Infrastructure.Logs.Logging;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace Infrastructure;
 
@@ -34,6 +37,18 @@ public static class DependencyInjection
             options.Password.RequireUppercase = false;
             options.Password.RequiredLength = 6;
             options.Password.RequiredUniqueChars = 1;
+
+            // options.User.RequireUniqueEmail = true;
+
+            options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+ đĐáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ";
+        });
+
+        Log.Logger = SerilogLogger.Configure(configuration);
+    
+        services.AddLogging(loggingBuilder => 
+        {
+            loggingBuilder.ClearProviders();
+            loggingBuilder.AddSerilog();
         });
         
         return services;

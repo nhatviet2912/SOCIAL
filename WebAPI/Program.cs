@@ -1,5 +1,6 @@
 using Application;
 using Infrastructure;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 
 builder.Services.AddControllers();
-
+builder.Host.UseSerilog();
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
