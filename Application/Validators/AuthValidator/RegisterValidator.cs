@@ -1,4 +1,4 @@
-﻿using Application.DTO.Register;
+﻿using Application.DTO.Request.Register;
 using FluentValidation;
 
 namespace Application.Validators.AuthValidator;

@@ -1,4 +1,9 @@
-﻿using Application.Common.Exception;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using Application.Common.Exception;
+using Application.Common.Interfaces.Repositories;
 using Application.Common.Interfaces.Service;
 using Application.Common.Model;
 using Application.DTO.Request.Login;
@@ -7,9 +12,12 @@ using Application.DTO.Response.User;
 using AutoMapper;
 using Domain.Constants;
 using Domain.Entities;
+using Domain.Entities.Settings;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Application.Service;
 
@@ -17,10 +25,25 @@ public class IdentityService : IIdentityService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IMapper _mapper;
-    public IdentityService(UserManager<ApplicationUser> userManager, IMapper mapper)
+    private readonly JwtSettings _jwtSettings;
+    private readonly IConfiguration _configuration;
+    private readonly RoleManager<ApplicationRole> _roleManager;
+    private readonly IDateTimeService _dateTimeService;
+    private readonly IUnitOfWork _unitOfWork;
+    public IdentityService(UserManager<ApplicationUser> userManager, 
+        IMapper mapper, 
+        IConfiguration configuration,
+        RoleManager<ApplicationRole> roleManager,
+        IDateTimeService dateTimeService,
+        IUnitOfWork unitOfWork)
     {
         _userManager = userManager;
+        _roleManager = roleManager;
         _mapper = mapper;
+        _configuration = configuration;
+        _jwtSettings = _configuration.GetSection("JwtSettings").Get<JwtSettings>();
+        _dateTimeService = dateTimeService;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<bool> CreateUserAsync(RegisterRequest request)
@@ -63,20 +86,114 @@ public class IdentityService : IIdentityService
         return await Result<List<UserResponse>>.SuccessAsync(response, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
 
-    public async Task<AuthResponse> LoginAsync(LoginRequest request)
+    public async Task<Result<TokenResponse>> LoginAsync(LoginRequest request)
     {
+        var refreshTokenRepository = _unitOfWork.Repository<RefreshToken>();
+        var now = await _dateTimeService.GetCurrentDateTimeAsync();
+        
         var user = await _userManager.FindByEmailAsync(request.Email!);
         if (user == null) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
-        if (user.LockoutEnabled) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_LOCKED);
+        if (user.LockoutEnd >= now) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_LOCKED);
         var password = await _userManager.CheckPasswordAsync(user, request.Password!);
 
         if (!password) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.PASSWORD_INVALID);
-
-        // var gêểênr
-
-    }
-
-    private string GenerateJwtAsync () {
         
+        var token = await GenerateJwtAsync(user);
+        
+        var refresh = new RefreshToken
+        {
+            UserId = user.Id,
+            Token = GenerateRefreshToken(),
+            Expires = now.AddDays(7)
+        };
+        if (await refreshTokenRepository.FirstOrDefaultAsync(t => t.UserId == user.Id) != null)
+        {
+            await refreshTokenRepository.AddAsync(refresh);
+        }
+        else
+        {
+            refreshTokenRepository.Update(refresh);
+        }
+        await _unitOfWork.SaveChangesAsync();
+        var tokenResponse = new TokenResponse(token, refresh.Token, refresh.Expires);
+        return await Result<TokenResponse>.SuccessAsync(tokenResponse, ResponseCode.SUCCESS, StatusCodes.Status200OK);
+    }
+    
+    private async Task<string> GenerateJwtAsync(ApplicationUser user)
+    {
+        return GenerateEncryptedToken(GetSigningCredentials(), await GetClaimsAsync(user));
+    }
+    
+    private string GenerateRefreshToken()
+    {
+        var randomNumber = new byte[32];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(randomNumber);
+        return Convert.ToBase64String(randomNumber);
+    }
+    
+    private string GenerateEncryptedToken(SigningCredentials signingCredentials, IEnumerable<Claim> claims)
+    {
+        var now = _dateTimeService.Now;
+        var token = new JwtSecurityToken(
+            claims: claims,
+            expires: now.AddMinutes(_jwtSettings.DurationInMinutes),
+            signingCredentials: signingCredentials);
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var encryptedToken = tokenHandler.WriteToken(token);
+        return encryptedToken;
+    }
+    
+    private SigningCredentials GetSigningCredentials()
+    {
+        var secret = Encoding.UTF8.GetBytes(_jwtSettings.Secret!);
+        return new SigningCredentials(new SymmetricSecurityKey(secret), SecurityAlgorithms.HmacSha256);
+    }
+    
+    private async Task<IEnumerable<Claim>> GetClaimsAsync(ApplicationUser user)
+    {
+        // var userClaims = await _userManager.GetClaimsAsync(user);
+        // var roles = await _userManager.GetRolesAsync(user);
+        // var roleClaims = new List<Claim>();
+        // var permissionClaims = new List<Claim>();
+        // foreach (var role in roles)
+        // {
+        //     roleClaims.Add(new Claim(ClaimTypes.Role, role));
+        //     var thisRole = await _roleManager.FindByNameAsync(role);
+        //     var allPermissionsForThisRoles = await _roleManager.GetClaimsAsync(thisRole);
+        //     permissionClaims.AddRange(allPermissionsForThisRoles);
+        // }
+        //
+        // var claims = new List<Claim>
+        //     {
+        //         new(ClaimTypes.NameIdentifier, user.Id),
+        //         new(ClaimTypes.Email, user.Email),
+        //         new(ClaimTypes.GivenName, user.DisplayName),
+        //         new(ClaimTypes.MobilePhone, user.PhoneNumber ?? string.Empty)
+        //     }
+        //     .Union(userClaims)
+        //     .Union(roleClaims)
+        //     .Union(permissionClaims);
+        //
+        // return claims;
+        
+        var userClaims = await _userManager.GetClaimsAsync(user);
+        var roles = await _userManager.GetRolesAsync(user);
+        var roleClaims = new List<Claim>();
+
+        foreach (var role in roles)
+            roleClaims.Add(new Claim("roles", role));
+
+        var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserName!),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email!),
+                new Claim("userId", user.Id.ToString()),
+            }
+            .Union(userClaims)
+            .Union(roleClaims);
+
+        return claims;
     }
 }

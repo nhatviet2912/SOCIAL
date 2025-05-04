@@ -9,5 +9,5 @@ public interface IIdentityService
 {
     Task<bool> CreateUserAsync(RegisterRequest request);
     Task<Result<List<UserResponse>>> GetAllUsersAsync();
-    Task<AuthResponse> LoginAsync(LoginRequest request);
+    Task<Result<TokenResponse>> LoginAsync(LoginRequest request);
 }
