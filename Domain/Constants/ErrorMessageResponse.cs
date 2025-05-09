@@ -10,4 +10,9 @@ public static class ErrorMessageResponse
     public const string AN_ERROR = "An error has occurred";
     public const string VALIDATION_FAILED = "Validation failed: {0}";
     public const string PASSWORD_INVALID = "Password invalid";
+    public const string ROLE_NOT_FOUND = "Role not found";
+    public const string ROLE_ALREADY_EXIST = "Role already exist";
+    public const string IS_ROLE_EXIST = "Is role exist";
+    public const string INVALID_ROLES = "Invalid roles: {0}";
+    public const string ALL_ROLES_ALREADY_ASSIGNED = "All roles already assigned";
 }

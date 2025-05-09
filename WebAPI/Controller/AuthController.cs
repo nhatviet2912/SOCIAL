@@ -1,18 +1,18 @@
 ﻿using Application.Common.Interfaces.Service;
 using Application.DTO.Request.Login;
 using Application.DTO.Request.Register;
+using Application.DTO.Request.Role;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace WebAPI.Controller;
 
 public class AuthController : BaseController
 {
-    private readonly ILogger<AuthController> _logger;
     private readonly IIdentityService _identityService;
-    public AuthController(IIdentityService identityService, ILogger<AuthController> logger)
+    public AuthController(IIdentityService identityService)
     {
         _identityService = identityService;
-        _logger = logger;
     }
     
     [HttpPost("Register")]
@@ -27,6 +27,7 @@ public class AuthController : BaseController
     [HttpGet("GetAllUsers")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Policy = "RequiredAdminManager")]
     public async Task<IActionResult> GetAllUsers()
     {
         var result = await _identityService.GetAllUsersAsync();
@@ -39,6 +40,26 @@ public class AuthController : BaseController
     public async Task<IActionResult> Login(LoginRequest request)
     {
         var result = await _identityService.LoginAsync(request);
+        return Ok(result);
+    }
+    
+    [HttpPost("CreateRole")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Policy = "RequiredAdminManager")]
+    public async Task<IActionResult> CreateRole(RoleRequest request)
+    {
+        var result = await _identityService.CreateRoleAsync(request);
+        return Ok(result);
+    }
+    
+    [HttpPost("AssignRoles")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize(Policy = "RequiredAdminManager")]
+    public async Task<IActionResult> AssignRoles(AssignRoleRequest request)
+    {
+        var result = await _identityService.AssignRolesAsync(request);
         return Ok(result);
     }
 }

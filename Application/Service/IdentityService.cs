@@ -8,6 +8,7 @@ using Application.Common.Interfaces.Service;
 using Application.Common.Model;
 using Application.DTO.Request.Login;
 using Application.DTO.Request.Register;
+using Application.DTO.Request.Role;
 using Application.DTO.Response.User;
 using AutoMapper;
 using Domain.Constants;
@@ -46,7 +47,7 @@ public class IdentityService : IIdentityService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<bool> CreateUserAsync(RegisterRequest request)
+    public async Task<Result<bool>> CreateUserAsync(RegisterRequest request)
     {
         if (await _userManager.FindByEmailAsync(request.Email!) != null)
         {
@@ -73,10 +74,10 @@ public class IdentityService : IIdentityService
         
         if (!result.Succeeded)
         {
-            throw new CustomException(StatusCodes.Status500InternalServerError, "12");
+            throw new CustomException(StatusCodes.Status500InternalServerError, ErrorMessageResponse.AN_ERROR);
         }
 
-        return true;
+        return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
 
     public async Task<Result<List<UserResponse>>> GetAllUsersAsync()
@@ -89,7 +90,7 @@ public class IdentityService : IIdentityService
     public async Task<Result<TokenResponse>> LoginAsync(LoginRequest request)
     {
         var refreshTokenRepository = _unitOfWork.Repository<RefreshToken>();
-        var now = await _dateTimeService.GetCurrentDateTimeAsync();
+        var now = _dateTimeService.GetCurrentDateTimeAsync();
         
         var user = await _userManager.FindByEmailAsync(request.Email!);
         if (user == null) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
@@ -118,6 +119,71 @@ public class IdentityService : IIdentityService
         var tokenResponse = new TokenResponse(token, refresh.Token, refresh.Expires);
         return await Result<TokenResponse>.SuccessAsync(tokenResponse, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
+
+    public async Task<Result<bool>> AssignRolesAsync(AssignRoleRequest request)
+    {
+        var user = await _userManager.FindByIdAsync(request.UserId.ToString());
+        if (user == null)
+            throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
+        var existingRoles = await _userManager.GetRolesAsync(user);
+        var rolesToAdd = request.RoleNames!.Except(existingRoles).ToList();
+        
+        if (rolesToAdd.Count == 0)
+            throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.ALL_ROLES_ALREADY_ASSIGNED);
+        
+        var validRoles = new List<string>();
+        var invalidRoles = new List<string>();
+
+        foreach (var roleName in rolesToAdd)
+        {
+            var roleExists = await _roleManager.RoleExistsAsync(roleName);
+            if (roleExists)
+                validRoles.Add(roleName);
+            else
+                invalidRoles.Add(roleName);
+        }
+
+        if (invalidRoles.Any())
+        {
+            throw new CustomException(
+                StatusCodes.Status400BadRequest,
+                string.Format(ErrorMessageResponse.INVALID_ROLES, string.Join(", ", invalidRoles))
+            );
+        }
+        var result = await _userManager.AddToRolesAsync(user, validRoles);
+        if (!result.Succeeded)
+            throw new CustomException(StatusCodes.Status500InternalServerError, ErrorMessageResponse.AN_ERROR);
+        
+        return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
+    }
+
+    public Task RevokeTokenAsync(string token)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task RefreshTokenAsync(string token)
+    {
+        throw new NotImplementedException();
+    }
+
+    public async Task<Result<bool>> CreateRoleAsync(RoleRequest request)
+    {
+        var role = await _roleManager.FindByNameAsync(request.RoleName!);
+        if (role != null)
+            throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.ROLE_NOT_FOUND);
+        var newRole = new ApplicationRole
+        {
+            Name = request.RoleName,
+            NormalizedName = request.RoleName!.ToUpper()
+        };
+        var result = await _roleManager.CreateAsync(newRole);
+        
+        if (!result.Succeeded)
+            throw new CustomException(StatusCodes.Status500InternalServerError, ErrorMessageResponse.AN_ERROR);
+        
+        return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
+    }
     
     private async Task<string> GenerateJwtAsync(ApplicationUser user)
     {
@@ -134,8 +200,10 @@ public class IdentityService : IIdentityService
     
     private string GenerateEncryptedToken(SigningCredentials signingCredentials, IEnumerable<Claim> claims)
     {
-        var now = _dateTimeService.Now;
+        var now = _dateTimeService.GetCurrentDateTimeAsync();
         var token = new JwtSecurityToken(
+            issuer: _jwtSettings.Issuer,
+            audience: _jwtSettings.Audience,
             claims: claims,
             expires: now.AddMinutes(_jwtSettings.DurationInMinutes),
             signingCredentials: signingCredentials);
@@ -152,32 +220,6 @@ public class IdentityService : IIdentityService
     
     private async Task<IEnumerable<Claim>> GetClaimsAsync(ApplicationUser user)
     {
-        // var userClaims = await _userManager.GetClaimsAsync(user);
-        // var roles = await _userManager.GetRolesAsync(user);
-        // var roleClaims = new List<Claim>();
-        // var permissionClaims = new List<Claim>();
-        // foreach (var role in roles)
-        // {
-        //     roleClaims.Add(new Claim(ClaimTypes.Role, role));
-        //     var thisRole = await _roleManager.FindByNameAsync(role);
-        //     var allPermissionsForThisRoles = await _roleManager.GetClaimsAsync(thisRole);
-        //     permissionClaims.AddRange(allPermissionsForThisRoles);
-        // }
-        //
-        // var claims = new List<Claim>
-        //     {
-        //         new(ClaimTypes.NameIdentifier, user.Id),
-        //         new(ClaimTypes.Email, user.Email),
-        //         new(ClaimTypes.GivenName, user.DisplayName),
-        //         new(ClaimTypes.MobilePhone, user.PhoneNumber ?? string.Empty)
-        //     }
-        //     .Union(userClaims)
-        //     .Union(roleClaims)
-        //     .Union(permissionClaims);
-        //
-        // return claims;
-        
-        var userClaims = await _userManager.GetClaimsAsync(user);
         var roles = await _userManager.GetRolesAsync(user);
         var roleClaims = new List<Claim>();
 
@@ -191,7 +233,6 @@ public class IdentityService : IIdentityService
                 new Claim(JwtRegisteredClaimNames.Email, user.Email!),
                 new Claim("userId", user.Id.ToString()),
             }
-            .Union(userClaims)
             .Union(roleClaims);
 
         return claims;

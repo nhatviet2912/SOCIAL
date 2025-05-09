@@ -30,11 +30,11 @@ public static class DependencyInjection
                                                    + "'DefaultConnection' not found.");
 
         var version = ServerVersion.AutoDetect(connectionString);
-        services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseMySql(connectionString, version).UseLazyLoadingProxies())
-            .AddIdentity<ApplicationUser, ApplicationRole>()
+        services.AddDbContext<ApplicationDbContext>(options => 
+            options.UseMySql(connectionString, version).UseLazyLoadingProxies());
+
+        services.AddIdentity<ApplicationUser, ApplicationRole>()
             .AddEntityFrameworkStores<ApplicationDbContext>()
-            .AddDefaultUI()
             .AddDefaultTokenProviders();
         
         services.Configure<IdentityOptions>(options =>
@@ -80,8 +80,9 @@ public static class DependencyInjection
 
                     ValidIssuer = jwtSettings?.Issuer,
                     ValidAudience = jwtSettings?.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key))
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
                 };
+                o.SaveToken = true;
             });
         
         services.AddTransient<IDateTimeService, DateTimeService>();

@@ -15,8 +15,9 @@ builder.Services.AddSwaggerGen(options =>
         Description = "JWT Authorization header using the Bearer scheme.",
         Name = "Authorization",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -41,6 +42,12 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 
+builder.Services.AddAuthorization(option =>
+{
+    option.AddPolicy("RequiredAdminManager", policy => policy.RequireRole("Admin", "Manager"));
+    option.AddPolicy("RequiredUser", policy => policy.RequireRole("User"));
+});
+
 builder.Services.AddControllers();
 builder.Host.UseSerilog();
 var app = builder.Build();
@@ -59,7 +66,7 @@ app.ConfigureExceptionHandler(logger);
 app.UseValidationExceptionHandling();
 app.MapControllers();
 
-app.UseAuthorization();
 app.UseAuthentication();
+app.UseAuthorization();
 app.UseHttpsRedirection();
 app.Run();
