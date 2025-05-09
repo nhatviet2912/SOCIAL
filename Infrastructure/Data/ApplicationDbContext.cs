@@ -78,4 +78,5 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     }
     
     public DbSet<Member> Members { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 }
