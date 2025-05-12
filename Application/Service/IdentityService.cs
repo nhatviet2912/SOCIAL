@@ -117,16 +117,12 @@ public class IdentityService : IIdentityService
         {
             UserId = user.Id,
             Token = GenerateRefreshToken(),
-            Expires = now.AddDays(7)
+            Expires = now.AddDays(7),
+            CreatedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString(),
+            DeviceInfo = _httpContextAccessor.HttpContext.Request.Headers["User-Agent"].ToString(),
+            RemoteIpAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString()
         };
-        if (await refreshTokenRepository.FirstOrDefaultAsync(t => t.UserId == user.Id) != null)
-        {
-            await refreshTokenRepository.AddAsync(refresh);
-        }
-        else
-        {
-            refreshTokenRepository.Update(refresh);
-        }
+        await refreshTokenRepository.AddAsync(refresh);
         await _unitOfWork.SaveChangesAsync();
         var tokenResponse = new TokenResponse(token, refresh.Token, refresh.Expires);
         return await Result<TokenResponse>.SuccessAsync(tokenResponse, ResponseCode.SUCCESS, StatusCodes.Status200OK);
@@ -169,37 +165,71 @@ public class IdentityService : IIdentityService
         return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
 
-    public Task RevokeTokenAsync(string token)
-    {
-        throw new NotImplementedException();
-    }
-
     public Task RefreshTokenAsync(string token)
     {
         throw new NotImplementedException();
     }
 
-    public async Task LogoutAsync(RefreshTokenRequest request)
+    public async Task<Result<bool>> LogoutAsync(RefreshTokenRequest request)
     {
         var refreshTokenRepository = _unitOfWork.Repository<RefreshToken>();
-        var token = await _httpContextAccessor.HttpContext.GetTokenAsync("access_token") ?? 
-                    _httpContextAccessor.HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-
-        if (token == null) throw new Exception();
-        
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
-        await _cacheService.BlacklistTokenAsync(jwtToken.Id, jwtToken.ValidTo);
 
         if (request.RefreshToken != null)
         {
-            var refreshToken = await refreshTokenRepository.FirstOrDefaultAsync(t => t.Token.ToString() == request.RefreshToken);
+            var refreshToken = await refreshTokenRepository.FirstOrDefaultAsync(t => t.Token == request.RefreshToken);
 
             if (refreshToken != null && refreshToken.IsActive)
             {
-                await 
+                await RevokeTokenAsync(refreshToken, _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString());
             }
         }
+
+        await AddBlackListTokenAsync();
+
+        return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
+    }
+
+    public async Task<Result<bool>> LogoutAllAsync()
+    {
+        var userId = _httpContextAccessor.HttpContext.User.FindFirst("userId")?.Value;
+        var now = _dateTimeService.GetCurrentDateTimeAsync();
+        var refreshTokenRepository = _unitOfWork.Repository<RefreshToken>();
+        
+        var user = await _userManager.Users
+            .Include(f => f.RefreshTokens)
+            .FirstOrDefaultAsync(u => u.Id == Guid.Parse(userId));
+
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            foreach (var token in user.RefreshTokens.Where(t => t.IsActive))
+            {
+                token.Revoked = now;
+                token.RevokedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
+                refreshTokenRepository.Update(token);
+            }
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+            await AddBlackListTokenAsync();
+            return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
+        }
+        catch (Exception e)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            return await Result<bool>.FailureAsync(false, e.Message, StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    public async Task<Result<bool>> RevokeTokenAsync(RefreshToken token, string ipAddress)
+    {
+        var refreshTokenRepository = _unitOfWork.Repository<RefreshToken>();
+        var now = _dateTimeService.GetCurrentDateTimeAsync();
+        token.Revoked = now;
+        token.RevokedByIp = ipAddress;
+        refreshTokenRepository.Update(token);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
 
     public async Task<Result<bool>> CreateRoleAsync(RoleRequest request)
@@ -271,5 +301,18 @@ public class IdentityService : IIdentityService
             .Union(roleClaims);
 
         return claims;
+    }
+
+    private async Task AddBlackListTokenAsync()
+    {
+        var token = await _httpContextAccessor.HttpContext.GetTokenAsync("access_token") ?? 
+                    _httpContextAccessor.HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+
+        if (token == null) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.TOKEN_IS_NULL);
+        
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(token);
+        
+        await _cacheService.BlacklistTokenAsync(jwtToken.Id, jwtToken.ValidTo);
     }
 }

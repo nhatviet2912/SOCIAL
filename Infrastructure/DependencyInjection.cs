@@ -1,22 +1,18 @@
-﻿
-using System.Text;
-using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces;
 using Application.Common.Interfaces.Repositories;
 using Application.Common.Interfaces.Service;
 using Domain.Entities;
-using Domain.Entities.Settings;
 using Infrastructure.Cache;
 using Infrastructure.Data;
+using Infrastructure.Extensions;
 using Infrastructure.Logs.Logging;
 using Infrastructure.Repository;
 using Infrastructure.Service;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using StackExchange.Redis;
 
@@ -67,30 +63,7 @@ public static class DependencyInjection
             loggingBuilder.AddSerilog();
         });
         
-        services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
-        var jwtSettings = configuration.GetSection("JwtSettings").Get<JwtSettings>();
-        services.AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-
-            .AddJwtBearer(o =>
-            {
-                o.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero,
-
-                    ValidIssuer = jwtSettings?.Issuer,
-                    ValidAudience = jwtSettings?.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
-                };
-                o.SaveToken = true;
-            });
+        services.AddJwtExtension(configuration);
         
         services.AddTransient<IDateTimeService, DateTimeService>();
         services.AddScoped<ICacheService, CacheRepository>();
