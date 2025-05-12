@@ -5,6 +5,7 @@ using Application.Common.Interfaces.Repositories;
 using Application.Common.Interfaces.Service;
 using Domain.Entities;
 using Domain.Entities.Settings;
+using Infrastructure.Cache;
 using Infrastructure.Data;
 using Infrastructure.Logs.Logging;
 using Infrastructure.Repository;
@@ -17,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using StackExchange.Redis;
 
 namespace Infrastructure;
 
@@ -28,6 +30,8 @@ public static class DependencyInjection
             configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("Connection string"
                                                    + "'DefaultConnection' not found.");
+        var redisConnectionString = configuration.GetConnectionString("Redis")
+            ?? throw new InvalidOperationException("Connection string");
 
         var version = ServerVersion.AutoDetect(connectionString);
         services.AddDbContext<ApplicationDbContext>(options => 
@@ -36,6 +40,9 @@ public static class DependencyInjection
         services.AddIdentity<ApplicationUser, ApplicationRole>()
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
+        
+        services.AddSingleton<IConnectionMultiplexer>(_ => 
+            ConnectionMultiplexer.Connect(redisConnectionString));
         
         services.Configure<IdentityOptions>(options =>
         {
@@ -86,6 +93,7 @@ public static class DependencyInjection
             });
         
         services.AddTransient<IDateTimeService, DateTimeService>();
+        services.AddScoped<ICacheService, CacheRepository>();
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         return services;

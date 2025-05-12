@@ -31,12 +31,14 @@ public class IdentityService : IIdentityService
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly IDateTimeService _dateTimeService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
     public IdentityService(UserManager<ApplicationUser> userManager, 
         IMapper mapper, 
         IConfiguration configuration,
         RoleManager<ApplicationRole> roleManager,
         IDateTimeService dateTimeService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ICacheService cacheService)
     {
         _userManager = userManager;
         _roleManager = roleManager;
@@ -45,6 +47,7 @@ public class IdentityService : IIdentityService
         _jwtSettings = _configuration.GetSection("JwtSettings").Get<JwtSettings>();
         _dateTimeService = dateTimeService;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
     }
 
     public async Task<Result<bool>> CreateUserAsync(RegisterRequest request)
@@ -82,8 +85,12 @@ public class IdentityService : IIdentityService
 
     public async Task<Result<List<UserResponse>>> GetAllUsersAsync()
     {
+        var key = "GetAllUsers";
+        var cache = await _cacheService.GetAsync<List<UserResponse>>(key);
+        if (cache != null) return await Result<List<UserResponse>>.SuccessAsync(cache, ResponseCode.SUCCESS, StatusCodes.Status200OK);
         var users = await _userManager.Users.ToListAsync();
         var response = _mapper.Map<List<UserResponse>>(users);
+        await _cacheService.SetAsync(key, response, TimeSpan.FromMinutes(10));
         return await Result<List<UserResponse>>.SuccessAsync(response, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
 
@@ -163,6 +170,11 @@ public class IdentityService : IIdentityService
     }
 
     public Task RefreshTokenAsync(string token)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task LogoutAsync(string token)
     {
         throw new NotImplementedException();
     }
