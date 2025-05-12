@@ -1,6 +1,8 @@
 using Application;
 using Infrastructure;
-using Microsoft.OpenApi.Models;
+using Infrastructure.Data;
+using Infrastructure.Seed;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using WebAPI.Extensions;
 
@@ -25,6 +27,25 @@ builder.Host.UseSerilog();
 
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<ApplicationDbContext>();
+
+        // Áp dụng migration nếu cần
+        context.Database.Migrate();
+
+        // Gọi seed
+        await ApplicationUserSeed.SeedAsync(services);
+    }
+    catch (Exception ex)
+    {
+        
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
