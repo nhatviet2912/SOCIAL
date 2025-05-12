@@ -32,4 +32,15 @@ public class CacheRepository : ICacheService
     {
         await _redisDb.KeyDeleteAsync(key);
     }
+
+    public async Task<bool> BlacklistTokenAsync(string key, DateTime expiry)
+    {
+        var timeToLive = expiry - DateTime.UtcNow;
+        return await _redisDb.StringSetAsync(key, "revoked", timeToLive);
+    }
+
+    public async Task<bool> IsBlacklistedAsync(string key)
+    {
+        return await _redisDb.KeyExistsAsync(key);
+    }
 }

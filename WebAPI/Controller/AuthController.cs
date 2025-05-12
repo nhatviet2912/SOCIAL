@@ -2,6 +2,7 @@
 using Application.DTO.Request.Login;
 using Application.DTO.Request.Register;
 using Application.DTO.Request.Role;
+using Application.DTO.Request.Token;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -61,5 +62,15 @@ public class AuthController : BaseController
     {
         var result = await _identityService.AssignRolesAsync(request);
         return Ok(result);
+    }
+
+    [HttpPost("Logout")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize]
+    public async Task<IActionResult> Logout(RefreshTokenRequest request)
+    {
+        await _identityService.LogoutAsync(request);
+        return Ok();
     }
 }

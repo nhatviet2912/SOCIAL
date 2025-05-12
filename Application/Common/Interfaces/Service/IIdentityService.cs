@@ -2,6 +2,7 @@
 using Application.DTO.Request.Login;
 using Application.DTO.Request.Register;
 using Application.DTO.Request.Role;
+using Application.DTO.Request.Token;
 using Application.DTO.Response.User;
 
 namespace Application.Common.Interfaces.Service;
@@ -15,5 +16,5 @@ public interface IIdentityService
     Task<Result<bool>> AssignRolesAsync(AssignRoleRequest request);
     Task RevokeTokenAsync(string token);
     Task RefreshTokenAsync(string token);
-    Task LogoutAsync(string token);
+    Task LogoutAsync(RefreshTokenRequest request);
 }
