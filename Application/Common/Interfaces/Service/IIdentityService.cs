@@ -15,4 +15,5 @@ public interface IIdentityService
     Task<Result<bool>> AssignRolesAsync(AssignRoleRequest request);
     Task RevokeTokenAsync(string token);
     Task RefreshTokenAsync(string token);
+    Task LogoutAsync(string token);
 }
