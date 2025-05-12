@@ -9,11 +9,13 @@ using Application.Common.Model;
 using Application.DTO.Request.Login;
 using Application.DTO.Request.Register;
 using Application.DTO.Request.Role;
+using Application.DTO.Request.Token;
 using Application.DTO.Response.User;
 using AutoMapper;
 using Domain.Constants;
 using Domain.Entities;
 using Domain.Entities.Settings;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -32,13 +34,15 @@ public class IdentityService : IIdentityService
     private readonly IDateTimeService _dateTimeService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     public IdentityService(UserManager<ApplicationUser> userManager, 
         IMapper mapper, 
         IConfiguration configuration,
         RoleManager<ApplicationRole> roleManager,
         IDateTimeService dateTimeService,
         IUnitOfWork unitOfWork,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IHttpContextAccessor httpContextAccessor)
     {
         _userManager = userManager;
         _roleManager = roleManager;
@@ -48,6 +52,7 @@ public class IdentityService : IIdentityService
         _dateTimeService = dateTimeService;
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<Result<bool>> CreateUserAsync(RegisterRequest request)
@@ -174,9 +179,27 @@ public class IdentityService : IIdentityService
         throw new NotImplementedException();
     }
 
-    public Task LogoutAsync(string token)
+    public async Task LogoutAsync(RefreshTokenRequest request)
     {
-        throw new NotImplementedException();
+        var refreshTokenRepository = _unitOfWork.Repository<RefreshToken>();
+        var token = await _httpContextAccessor.HttpContext.GetTokenAsync("access_token") ?? 
+                    _httpContextAccessor.HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+
+        if (token == null) throw new Exception();
+        
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(token);
+        await _cacheService.BlacklistTokenAsync(jwtToken.Id, jwtToken.ValidTo);
+
+        if (request.RefreshToken != null)
+        {
+            var refreshToken = await refreshTokenRepository.FirstOrDefaultAsync(t => t.Token.ToString() == request.RefreshToken);
+
+            if (refreshToken != null && refreshToken.IsActive)
+            {
+                await 
+            }
+        }
     }
 
     public async Task<Result<bool>> CreateRoleAsync(RoleRequest request)
