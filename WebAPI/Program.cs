@@ -1,9 +1,8 @@
 using Application;
 using Infrastructure;
-using Infrastructure.Data;
 using Infrastructure.Seed;
-using Microsoft.EntityFrameworkCore;
 using Serilog;
+using WebAPI;
 using WebAPI.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,8 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
-builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddWebServices();
 builder.Services.AddSwaggerExtension();
 
 builder.Services.AddAuthorization(option =>
@@ -28,24 +28,7 @@ builder.Host.UseSerilog();
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<ApplicationDbContext>();
-
-        // Áp dụng migration nếu cần
-        context.Database.Migrate();
-
-        // Gọi seed
-        await ApplicationUserSeed.SeedAsync(services);
-    }
-    catch (Exception ex)
-    {
-        
-    }
-}
+await DatabaseInitializer.InitializeAsync(app.Services);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -83,4 +83,34 @@ public class AuthController : BaseController
         var result = await _identityService.LogoutAllAsync();
         return Ok(result);
     }
+
+    [HttpPost("Logout_Devices")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize]
+    public async Task<IActionResult> LogoutDevicesAsync()
+    {
+        var result = await _identityService.LogoutDevicesAsync();
+        return Ok(result);
+    }
+
+    [HttpGet("GetActiveDevices")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize]
+    public async Task<IActionResult> GetActiveDevicesAsync()
+    {
+        var result = await _identityService.GetActiveDevicesAsync();
+        return Ok(result);
+    }
+
+    [HttpPost("RefreshToken")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize]
+    public async Task<IActionResult> RefreshTokenAsync(RefreshTokenRequest request)
+    {
+        var result = await _identityService.RefreshTokenAsync(request);
+        return Ok(result);
+    }
 }
