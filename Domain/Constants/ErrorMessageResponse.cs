@@ -15,4 +15,5 @@ public static class ErrorMessageResponse
     public const string IS_ROLE_EXIST = "Is role exist";
     public const string INVALID_ROLES = "Invalid roles: {0}";
     public const string ALL_ROLES_ALREADY_ASSIGNED = "All roles already assigned";
+    public const string TOKEN_IS_NULL = "Token is null";
 }

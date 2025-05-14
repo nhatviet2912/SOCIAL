@@ -8,6 +8,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public virtual ICollection<ApplicationUserLogin> Logins { get; set; } = null!;
     public virtual ICollection<ApplicationUserToken> Tokens { get; set; } = null!;
     public virtual ICollection<ApplicationUserRole> UserRoles { get; set; } = null!;
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = null!;
     
     public Guid MemberId { get; set; }
     public virtual Member Member { get; set; } = null!;

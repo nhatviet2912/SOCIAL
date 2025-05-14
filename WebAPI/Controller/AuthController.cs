@@ -19,7 +19,7 @@ public class AuthController : BaseController
     [HttpPost("Register")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Register(RegisterRequest request)
+    public async Task<IActionResult> RegisterAsync(RegisterRequest request)
     {
         var result = await _identityService.CreateUserAsync(request);
         return Ok(result);
@@ -29,7 +29,7 @@ public class AuthController : BaseController
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [Authorize(Policy = "RequiredAdminManager")]
-    public async Task<IActionResult> GetAllUsers()
+    public async Task<IActionResult> GetAllUsersAsync()
     {
         var result = await _identityService.GetAllUsersAsync();
         return Ok(result);
@@ -38,7 +38,7 @@ public class AuthController : BaseController
     [HttpPost("Login")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Login(LoginRequest request)
+    public async Task<IActionResult> LoginAsync(LoginRequest request)
     {
         var result = await _identityService.LoginAsync(request);
         return Ok(result);
@@ -48,7 +48,7 @@ public class AuthController : BaseController
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [Authorize(Policy = "RequiredAdminManager")]
-    public async Task<IActionResult> CreateRole(RoleRequest request)
+    public async Task<IActionResult> CreateRoleAsync(RoleRequest request)
     {
         var result = await _identityService.CreateRoleAsync(request);
         return Ok(result);
@@ -58,7 +58,7 @@ public class AuthController : BaseController
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [Authorize(Policy = "RequiredAdminManager")]
-    public async Task<IActionResult> AssignRoles(AssignRoleRequest request)
+    public async Task<IActionResult> AssignRolesAsync(AssignRoleRequest request)
     {
         var result = await _identityService.AssignRolesAsync(request);
         return Ok(result);
@@ -68,9 +68,19 @@ public class AuthController : BaseController
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [Authorize]
-    public async Task<IActionResult> Logout(RefreshTokenRequest request)
+    public async Task<IActionResult> LogoutAsync(RefreshTokenRequest request)
     {
-        await _identityService.LogoutAsync(request);
-        return Ok();
+        var result = await _identityService.LogoutAsync(request);
+        return Ok(result);
+    }
+
+    [HttpPost("Logout_All")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [Authorize]
+    public async Task<IActionResult> LogoutAllAsync()
+    {
+        var result = await _identityService.LogoutAllAsync();
+        return Ok(result);
     }
 }
