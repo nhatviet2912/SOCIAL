@@ -11,7 +11,7 @@ namespace Application.Common.Interfaces.Service;
 
 public interface IIdentityService
 {
-    Task<Result<bool>> CreateUserAsync(RegisterRequest request);
+    Task<Result<bool>> CreateUserAsync(RegisterRequest request, string origin);
     Task<Result<List<UserResponse>>> GetAllUsersAsync();
     Task<Result<TokenResponse>> LoginAsync(LoginRequest request);
     Task<Result<bool>> CreateRoleAsync(RoleRequest request);
@@ -22,4 +22,5 @@ public interface IIdentityService
     Task<Result<bool>> LogoutAllAsync();
     Task<Result<bool>> LogoutDevicesAsync();
     Task<Result<List<RefreshTokenResponse>>> GetActiveDevicesAsync();
+    Task<Result<bool>> ConfirmEmailAsync(string userId, string token);
 }

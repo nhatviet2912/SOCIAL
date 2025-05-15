@@ -21,7 +21,7 @@ public class AuthController : BaseController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RegisterAsync(RegisterRequest request)
     {
-        var result = await _identityService.CreateUserAsync(request);
+        var result = await _identityService.CreateUserAsync(request, Request.Headers["origin"]);
         return Ok(result);
     }
     
@@ -111,6 +111,15 @@ public class AuthController : BaseController
     public async Task<IActionResult> RefreshTokenAsync(RefreshTokenRequest request)
     {
         var result = await _identityService.RefreshTokenAsync(request);
+        return Ok(result);
+    }
+
+    [HttpGet("Confirm-Email")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConfirmEmailAsync([FromQuery] string userId, [FromQuery] string token)
+    {
+        var result = await _identityService.ConfirmEmailAsync(userId, token);
         return Ok(result);
     }
 }

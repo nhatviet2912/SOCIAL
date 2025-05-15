@@ -10,14 +10,29 @@ public class UnitOfWork : IUnitOfWork
     private readonly ApplicationDbContext _context;
     private IDbContextTransaction _transaction;
     private IRefreshTokenRepository _refreshTokenRepository;
+    private Dictionary<Type, object> _repositories;
 
     public UnitOfWork(ApplicationDbContext context, IRefreshTokenRepository refreshTokenRepository)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _repositories = new Dictionary<Type, object>();
         _refreshTokenRepository = refreshTokenRepository ?? throw new ArgumentNullException(nameof(refreshTokenRepository));
     }
     
     public IRefreshTokenRepository RefreshTokenRepository => _refreshTokenRepository;
+
+
+    public IGenericRepository<T> Repository<T>() where T : class
+    {
+        if (_repositories.ContainsKey(typeof(T)))
+        {
+            return (IGenericRepository<T>)_repositories[typeof(T)];
+        }
+
+        var repository = new GenericRepository<T>(_context);
+        _repositories.Add(typeof(T), repository);
+        return repository;
+    }
 
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
     {

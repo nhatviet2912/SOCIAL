@@ -3,6 +3,7 @@ using Application.Common.Interfaces.Repositories;
 using Application.Common.Interfaces.Service;
 using Domain.Constants;
 using Domain.Entities;
+using Domain.Entities.Settings;
 using Infrastructure.Cache;
 using Infrastructure.Data;
 using Infrastructure.Extensions;
@@ -14,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Serilog;
 using StackExchange.Redis;
 using Role = Domain.Constants.Role;
@@ -51,9 +53,10 @@ public static class DependencyInjection
             options.Password.RequireUppercase = false;
             options.Password.RequiredLength = 6;
             options.Password.RequiredUniqueChars = 1;
+            
+            options.SignIn.RequireConfirmedEmail = true;
 
-            // options.User.RequireUniqueEmail = true;
-
+            options.User.RequireUniqueEmail = true;
             options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+ đĐáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ";
         });
         
@@ -72,7 +75,12 @@ public static class DependencyInjection
         });
         
         services.AddJwtExtension(configuration);
+
+        services.Configure<EmailSettings>(configuration.GetSection("MailSettings"));
+        services.AddSingleton(sp =>
+            sp.GetRequiredService<IOptions<EmailSettings>>().Value);
         
+        services.AddTransient<IEmailService, EmailService>();
         services.AddTransient<IDateTimeService, DateTimeService>();
         services.AddScoped<ICacheService, CacheRepository>();
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
