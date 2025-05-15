@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<ICacheService, CacheRepository>();
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         return services;
     }
 }
