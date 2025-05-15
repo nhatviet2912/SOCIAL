@@ -1,6 +1,7 @@
 ﻿using Application.Common.Interfaces;
 using Application.Common.Interfaces.Repositories;
 using Application.Common.Interfaces.Service;
+using Domain.Constants;
 using Domain.Entities;
 using Infrastructure.Cache;
 using Infrastructure.Data;
@@ -15,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using StackExchange.Redis;
+using Role = Domain.Constants.Role;
 
 namespace Infrastructure;
 
@@ -53,6 +55,12 @@ public static class DependencyInjection
             // options.User.RequireUniqueEmail = true;
 
             options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+ đĐáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ";
+        });
+        
+        services.AddAuthorization(option =>
+        {
+            option.AddPolicy(Policies.AdminManager, policy => policy.RequireRole(Role.Admin, Role.Manager));
+            option.AddPolicy(Policies.User, policy => policy.RequireRole(Role.User));
         });
 
         Log.Logger = SerilogLogger.Configure(configuration);

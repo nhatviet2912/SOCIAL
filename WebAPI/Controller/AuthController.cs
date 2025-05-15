@@ -28,7 +28,7 @@ public class AuthController : BaseController
     [HttpGet("GetAllUsers")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "RequiredAdminManager")]
+    [Authorize(Policy = "AdminManager")]
     public async Task<IActionResult> GetAllUsersAsync()
     {
         var result = await _identityService.GetAllUsersAsync();
@@ -47,7 +47,7 @@ public class AuthController : BaseController
     [HttpPost("CreateRole")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "RequiredAdminManager")]
+    [Authorize(Policy = "AdminManager")]
     public async Task<IActionResult> CreateRoleAsync(RoleRequest request)
     {
         var result = await _identityService.CreateRoleAsync(request);
@@ -57,7 +57,7 @@ public class AuthController : BaseController
     [HttpPost("AssignRoles")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "RequiredAdminManager")]
+    [Authorize(Policy = "AdminManager")]
     public async Task<IActionResult> AssignRolesAsync(AssignRoleRequest request)
     {
         var result = await _identityService.AssignRolesAsync(request);
