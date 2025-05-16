@@ -16,12 +16,6 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddWebServices();
 builder.Services.AddSwaggerExtension();
 
-builder.Services.AddAuthorization(option =>
-{
-    option.AddPolicy("RequiredAdminManager", policy => policy.RequireRole("Admin", "Manager"));
-    option.AddPolicy("RequiredUser", policy => policy.RequireRole("User"));
-});
-
 builder.Services.AddControllers();
 builder.Host.UseSerilog();
 

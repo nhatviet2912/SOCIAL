@@ -4,6 +4,7 @@ namespace Application.Common.Interfaces;
 
 public interface IGenericRepository<T> where T : class
 {
+    IQueryable<T> Entities { get; }
     Task AddAsync(T entity);
     Task AddRangeAsync(IEnumerable<T> entities);
     Task<bool> AnyAsync(Expression<Func<T, bool>> filter);

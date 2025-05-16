@@ -21,14 +21,14 @@ public class AuthController : BaseController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RegisterAsync(RegisterRequest request)
     {
-        var result = await _identityService.CreateUserAsync(request);
+        var result = await _identityService.CreateUserAsync(request, Request.Headers["origin"]);
         return Ok(result);
     }
     
     [HttpGet("GetAllUsers")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "RequiredAdminManager")]
+    [Authorize(Policy = "AdminManager")]
     public async Task<IActionResult> GetAllUsersAsync()
     {
         var result = await _identityService.GetAllUsersAsync();
@@ -47,7 +47,7 @@ public class AuthController : BaseController
     [HttpPost("CreateRole")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "RequiredAdminManager")]
+    [Authorize(Policy = "AdminManager")]
     public async Task<IActionResult> CreateRoleAsync(RoleRequest request)
     {
         var result = await _identityService.CreateRoleAsync(request);
@@ -57,7 +57,7 @@ public class AuthController : BaseController
     [HttpPost("AssignRoles")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "RequiredAdminManager")]
+    [Authorize(Policy = "AdminManager")]
     public async Task<IActionResult> AssignRolesAsync(AssignRoleRequest request)
     {
         var result = await _identityService.AssignRolesAsync(request);
@@ -111,6 +111,15 @@ public class AuthController : BaseController
     public async Task<IActionResult> RefreshTokenAsync(RefreshTokenRequest request)
     {
         var result = await _identityService.RefreshTokenAsync(request);
+        return Ok(result);
+    }
+
+    [HttpGet("Confirm-Email")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConfirmEmailAsync([FromQuery] string userId, [FromQuery] string token)
+    {
+        var result = await _identityService.ConfirmEmailAsync(userId, token);
         return Ok(result);
     }
 }

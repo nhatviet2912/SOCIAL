@@ -19,6 +19,7 @@ using Domain.Entities.Settings;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -36,6 +37,7 @@ public class IdentityService : IIdentityService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IEmailService _emailService;
     public IdentityService(UserManager<ApplicationUser> userManager, 
         IMapper mapper, 
         IConfiguration configuration,
@@ -43,7 +45,8 @@ public class IdentityService : IIdentityService
         IDateTimeService dateTimeService,
         IUnitOfWork unitOfWork,
         ICacheService cacheService,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        IEmailService emailService)
     {
         _userManager = userManager;
         _roleManager = roleManager;
@@ -54,9 +57,10 @@ public class IdentityService : IIdentityService
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _httpContextAccessor = httpContextAccessor;
+        _emailService = emailService;
     }
 
-    public async Task<Result<bool>> CreateUserAsync(RegisterRequest request)
+    public async Task<Result<bool>> CreateUserAsync(RegisterRequest request, string origin)
     {
         if (await _userManager.FindByEmailAsync(request.Email!) != null)
         {
@@ -72,6 +76,7 @@ public class IdentityService : IIdentityService
         {
             UserName = request.UserName,
             Email = request.Email,
+            EmailConfirmed = false,
             Member = new Member()
             {
                 Id = Guid.NewGuid(),
@@ -85,8 +90,26 @@ public class IdentityService : IIdentityService
         {
             throw new CustomException(StatusCodes.Status500InternalServerError, ErrorMessageResponse.AN_ERROR);
         }
+        
+        // Send Mail
+        var confirmationLink = await SendVerificationEmail(user, origin);
+        await _emailService.SendEmailAsync(user.Email, "Confirm your email",
+            $"Please confirm your account by clicking this link: <a href='{confirmationLink}'>link</a>");
 
         return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
+    }
+    
+    private async Task<string> SendVerificationEmail(ApplicationUser user, string origin)
+    {
+        var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var route = "api/v1/Auth/Confirm-Email";
+
+        var _enpointUri = new Uri(string.Concat($"{origin}/", route));
+        var verificationUri = QueryHelpers.AddQueryString(_enpointUri.ToString(), "userId", user.Id.ToString());
+        verificationUri = QueryHelpers.AddQueryString(verificationUri, "token", code);
+        return verificationUri;
     }
 
     public async Task<Result<List<UserResponse>>> GetAllUsersAsync()
@@ -111,6 +134,8 @@ public class IdentityService : IIdentityService
 
         if (!password) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.PASSWORD_INVALID);
         
+        if (!await _userManager.IsEmailConfirmedAsync(user))
+            throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.EMAIL_NOT_CONFIRMED);
         var token = await GenerateJwtAsync(user);
         
         var refresh = new RefreshToken
@@ -122,7 +147,7 @@ public class IdentityService : IIdentityService
             DeviceInfo = _httpContextAccessor.HttpContext.Request.Headers["User-Agent"].ToString(),
             RemoteIpAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString()
         };
-        await _unitOfWork.RefreshTokenRepository.AddAsync(refresh);
+        await _unitOfWork.Repository<RefreshToken>().AddAsync(refresh);
         await _unitOfWork.SaveChangesAsync();
         var tokenResponse = new TokenResponse(token, refresh.Token, refresh.Expires);
         return await Result<TokenResponse>.SuccessAsync(tokenResponse, ResponseCode.SUCCESS, StatusCodes.Status200OK);
@@ -168,7 +193,7 @@ public class IdentityService : IIdentityService
     public async Task<Result<TokenResponse>> RefreshTokenAsync(RefreshTokenRequest request)
     {
         var now = _dateTimeService.GetCurrentDateTimeAsync();
-        var refreshToken = await _unitOfWork.RefreshTokenRepository.FirstOrDefaultAsync(f => f.Token == request.RefreshToken);
+        var refreshToken = await _unitOfWork.Repository<RefreshToken>().FirstOrDefaultAsync(f => f.Token == request.RefreshToken);
         if (refreshToken == null)
             throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.TOKEN_IS_NULL);
 
@@ -182,7 +207,7 @@ public class IdentityService : IIdentityService
         refreshToken.RemoteIpAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
 
         var accessToken = await GenerateJwtAsync(refreshToken.User);
-        _unitOfWork.RefreshTokenRepository.Update(refreshToken);
+        _unitOfWork.Repository<RefreshToken>().Update(refreshToken);
         await _unitOfWork.SaveChangesAsync();
         await AddBlackListTokenAsync();
         var tokenResponse = new TokenResponse(accessToken, refreshToken.Token, refreshToken.Expires);
@@ -193,7 +218,7 @@ public class IdentityService : IIdentityService
     {
         if (request?.RefreshToken != null)
         {
-            var refreshToken = await _unitOfWork.RefreshTokenRepository.FirstOrDefaultAsync(t => t.Token == request.RefreshToken);
+            var refreshToken = await _unitOfWork.Repository<RefreshToken>().FirstOrDefaultAsync(t => t.Token == request.RefreshToken);
 
             if (refreshToken != null && refreshToken.IsActive)
             {
@@ -222,7 +247,7 @@ public class IdentityService : IIdentityService
             {
                 token.Revoked = now;
                 token.RevokedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
-                _unitOfWork.RefreshTokenRepository.Update(token);
+                _unitOfWork.Repository<RefreshToken>().Update(token);
             }
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
@@ -245,7 +270,7 @@ public class IdentityService : IIdentityService
         var now = _dateTimeService.GetCurrentDateTimeAsync();
         
 
-        var token = await _unitOfWork.RefreshTokenRepository.FirstOrDefaultAsync(x => x.UserId == Guid.Parse(userId)
+        var token = await _unitOfWork.Repository<RefreshToken>().FirstOrDefaultAsync(x => x.UserId == Guid.Parse(userId)
             && x.DeviceInfo == userAgent && x.IsActive);
 
         if (token == null)
@@ -253,7 +278,7 @@ public class IdentityService : IIdentityService
 
         token.Revoked = now;
         token.RevokedByIp = ip;
-        _unitOfWork.RefreshTokenRepository.Update(token);
+        _unitOfWork.Repository<RefreshToken>().Update(token);
         await AddBlackListTokenAsync();
         return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
@@ -267,12 +292,26 @@ public class IdentityService : IIdentityService
         return await Result<List<RefreshTokenResponse>>.SuccessAsync(result, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
 
+    public async Task<Result<bool>> ConfirmEmailAsync(string userId, string token)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+            throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
+        
+        var result = await _userManager.ConfirmEmailAsync(user, token);
+        
+        if (!result.Succeeded)
+            throw new CustomException(StatusCodes.Status500InternalServerError, ErrorMessageResponse.AN_ERROR);
+
+        return await Result<bool>.SuccessAsync(result.Succeeded, ResponseCode.SUCCESS, StatusCodes.Status200OK);
+    }
+
     public async Task<Result<bool>> RevokeTokenAsync(RefreshToken token, string ipAddress)
     {
         var now = _dateTimeService.GetCurrentDateTimeAsync();
         token.Revoked = now;
         token.RevokedByIp = ipAddress;
-        _unitOfWork.RefreshTokenRepository.Update(token);
+        _unitOfWork.Repository<RefreshToken>().Update(token);
         await _unitOfWork.SaveChangesAsync();
 
         return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
