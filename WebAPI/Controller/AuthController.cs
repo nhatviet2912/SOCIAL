@@ -1,8 +1,11 @@
-﻿using Application.Common.Interfaces.Service;
+﻿using System.Security.Claims;
+using Application.Common.Interfaces.Service;
 using Application.DTO.Request.Login;
 using Application.DTO.Request.Register;
 using Application.DTO.Request.Role;
 using Application.DTO.Request.Token;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -121,5 +124,42 @@ public class AuthController : BaseController
     {
         var result = await _identityService.ConfirmEmailAsync(userId, token);
         return Ok(result);
+    }
+
+    [HttpGet("SignIn-Google")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult SignInGoogle()
+    {
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = "/api/v1/Auth/SignIn-Google-Callback",
+            Items =
+            {
+                { "prompt", "select_account" }, // Luôn hiển thị dialog chọn tài khoản
+                { "access_type", "offline" }   // Yêu cầu refresh_token (nếu cần)
+            }
+        };
+        
+        return Challenge(properties, GoogleDefaults.AuthenticationScheme);
+    }
+    
+    [HttpGet("SignIn-Google-Callback")]
+    public async Task<IActionResult> GoogleResponse()
+    {
+        var authenticateResult = await HttpContext.AuthenticateAsync(GoogleDefaults.AuthenticationScheme);
+            
+        if (!authenticateResult.Succeeded)
+            return BadRequest(new { error = "Google authentication failed" });
+
+        // Lấy thông tin người dùng
+        var email = authenticateResult.Principal.FindFirstValue(ClaimTypes.Email);
+        var name = authenticateResult.Principal.FindFirstValue(ClaimTypes.Name);
+        var googleId = authenticateResult.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrEmpty(email))
+            return BadRequest(new { error = "Email claim is missing" });
+
+        return Ok();
     }
 }

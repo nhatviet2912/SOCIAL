@@ -49,6 +49,16 @@ public static class JwtExtension
                         }
                     }
                 };
+            })
+            .AddGoogle(options =>
+            {
+                options.ClientId = configuration["Authentication:Google:ClientId"];
+                options.ClientSecret = configuration["Authentication:Google:ClientSecret"];
+                options.CallbackPath = "/api/v1/Auth/SignIn-Google-Callback";
+                options.SaveTokens = true;
+    
+                options.Scope.Add("profile");
+                options.Scope.Add("email");
             });
     }
 }

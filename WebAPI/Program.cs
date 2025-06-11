@@ -19,6 +19,16 @@ builder.Services.AddSwaggerExtension();
 builder.Services.AddControllers();
 builder.Host.UseSerilog();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", builder =>
+    {
+        builder.WithOrigins("http://localhost:4200") // Đổi thành URL frontend
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
@@ -32,6 +42,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+app.UseCors("Frontend");
 
 app.ConfigureExceptionHandler(logger);
 app.UseValidationExceptionHandling();
