@@ -15,9 +15,11 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddWebServices();
 builder.Services.AddSwaggerExtension();
+builder.Services.ConfigureCors();
 
 builder.Services.AddControllers();
 builder.Host.UseSerilog();
+
 
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
@@ -32,6 +34,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+app.UseCors("CorsPolicy");
 
 app.ConfigureExceptionHandler(logger);
 app.UseValidationExceptionHandling();

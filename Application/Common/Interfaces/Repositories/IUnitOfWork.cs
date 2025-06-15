@@ -1,4 +1,7 @@
-﻿namespace Application.Common.Interfaces.Repositories;
+﻿using Domain.Entities;
+using Microsoft.AspNetCore.Identity;
+
+namespace Application.Common.Interfaces.Repositories;
 
 public interface IUnitOfWork : IDisposable
 {
@@ -9,4 +12,5 @@ public interface IUnitOfWork : IDisposable
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     Task<bool> SaveChangesWithResultAsync(CancellationToken cancellationToken = default);
     IRefreshTokenRepository RefreshTokenRepository { get; }
+    UserManager<ApplicationUser> UserManager { get; }
 }

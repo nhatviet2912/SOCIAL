@@ -1,6 +1,8 @@
 ﻿using Application.Common.Interfaces;
 using Application.Common.Interfaces.Repositories;
+using Domain.Entities;
 using Infrastructure.Data;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Infrastructure.Repository;
@@ -9,18 +11,22 @@ public class UnitOfWork : IUnitOfWork
 {
     private readonly ApplicationDbContext _context;
     private IDbContextTransaction _transaction;
-    private IRefreshTokenRepository _refreshTokenRepository;
-    private Dictionary<Type, object> _repositories;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly Dictionary<Type, object> _repositories;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public UnitOfWork(ApplicationDbContext context, IRefreshTokenRepository refreshTokenRepository)
+    public UnitOfWork(ApplicationDbContext context, 
+        IRefreshTokenRepository refreshTokenRepository,
+        UserManager<ApplicationUser> _userManager)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _repositories = new Dictionary<Type, object>();
         _refreshTokenRepository = refreshTokenRepository ?? throw new ArgumentNullException(nameof(refreshTokenRepository));
+        _userManager = _userManager ?? throw new ArgumentNullException(nameof(_userManager));
     }
     
     public IRefreshTokenRepository RefreshTokenRepository => _refreshTokenRepository;
-
+    public UserManager<ApplicationUser> UserManager => _userManager;
 
     public IGenericRepository<T> Repository<T>() where T : class
     {

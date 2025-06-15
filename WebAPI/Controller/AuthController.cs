@@ -11,9 +11,11 @@ namespace WebAPI.Controller;
 public class AuthController : BaseController
 {
     private readonly IIdentityService _identityService;
-    public AuthController(IIdentityService identityService)
+    private readonly IExternalLoginService _externalLoginService; 
+    public AuthController(IIdentityService identityService, IExternalLoginService externalLoginService)
     {
         _identityService = identityService;
+        _externalLoginService = externalLoginService;
     }
     
     [HttpPost("Register")]
@@ -122,4 +124,45 @@ public class AuthController : BaseController
         var result = await _identityService.ConfirmEmailAsync(userId, token);
         return Ok(result);
     }
+
+    // [HttpGet("SignIn-Google")]
+    // [ProducesResponseType(StatusCodes.Status200OK)]
+    // [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    // public IActionResult SignInGoogle()
+    // {
+    //     var properties = new AuthenticationProperties
+    //     {
+    //         RedirectUri = Url.Action("GoogleResponse"),
+    //         Items = { { "prompt", "select_account" } }
+    //     };
+    //     
+    //     return Challenge(properties, GoogleDefaults.AuthenticationScheme);
+    // }
+    //
+    // [HttpGet("SignIn-Google-Callback")]
+    // public async Task<IActionResult> GoogleResponse()
+    // {
+    //     var authenticateResult = await HttpContext.AuthenticateAsync(GoogleDefaults.AuthenticationScheme);
+    //         
+    //     if (!authenticateResult.Succeeded)
+    //         return BadRequest(new { error = "Google authentication failed" });
+    //
+    //     // Lấy thông tin người dùng
+    //     var email = authenticateResult.Principal.FindFirstValue(ClaimTypes.Email);
+    //     var name = authenticateResult.Principal.FindFirstValue(ClaimTypes.Name);
+    //     var googleId = authenticateResult.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    //
+    //     if (string.IsNullOrEmpty(email))
+    //         return BadRequest(new { error = "Email claim is missing" });
+    //
+    //     return Ok();
+    // }
+    
+    [HttpPost("verify-google")]
+    public async Task<IActionResult> VerifyGoogleToken([FromBody] GoogleTokenRequest request)
+    {
+        var result = await _externalLoginService.VerifyGoogleToken(request);
+        return Ok(result);
+    }
+
 }
