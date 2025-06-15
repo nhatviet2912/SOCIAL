@@ -13,6 +13,9 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<IIdentityService, IdentityService>();
+        services.AddScoped<IExternalLoginService, ExternalLoginService>();
+        services.AddScoped<IJWTHandler, JWTHandler>();
+
 
         services.AddValidatorsFromAssemblyContaining<RegisterValidator>();
         services.AddFluentValidationAutoValidation();

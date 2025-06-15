@@ -1,6 +1,4 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using Application.Common.Exception;
 using Application.Common.Interfaces.Repositories;
@@ -15,14 +13,11 @@ using Application.DTO.Response.User;
 using AutoMapper;
 using Domain.Constants;
 using Domain.Entities;
-using Domain.Entities.Settings;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Application.Service;
 
@@ -30,34 +25,32 @@ public class IdentityService : IIdentityService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IMapper _mapper;
-    private readonly JwtSettings _jwtSettings;
-    private readonly IConfiguration _configuration;
     private readonly RoleManager<ApplicationRole> _roleManager;
     private readonly IDateTimeService _dateTimeService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IEmailService _emailService;
+    private readonly IJWTHandler _jwtHandler;
     public IdentityService(UserManager<ApplicationUser> userManager, 
         IMapper mapper, 
-        IConfiguration configuration,
         RoleManager<ApplicationRole> roleManager,
         IDateTimeService dateTimeService,
         IUnitOfWork unitOfWork,
         ICacheService cacheService,
         IHttpContextAccessor httpContextAccessor,
-        IEmailService emailService)
+        IEmailService emailService,
+        IJWTHandler jwtHandler)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _mapper = mapper;
-        _configuration = configuration;
-        _jwtSettings = _configuration.GetSection("JwtSettings").Get<JwtSettings>();
         _dateTimeService = dateTimeService;
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _httpContextAccessor = httpContextAccessor;
         _emailService = emailService;
+        _jwtHandler = jwtHandler;
     }
 
     public async Task<Result<bool>> CreateUserAsync(RegisterRequest request, string origin)
@@ -129,19 +122,20 @@ public class IdentityService : IIdentityService
         
         var user = await _userManager.FindByEmailAsync(request.Email!);
         if (user == null) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
+        
         if (user.LockoutEnd >= now) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_LOCKED);
-        var password = await _userManager.CheckPasswordAsync(user, request.Password!);
-
-        if (!password) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.PASSWORD_INVALID);
         
         if (!await _userManager.IsEmailConfirmedAsync(user))
             throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.EMAIL_NOT_CONFIRMED);
-        var token = await GenerateJwtAsync(user);
         
+        var password = await _userManager.CheckPasswordAsync(user, request.Password!);
+        if (!password) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.PASSWORD_INVALID);
+        
+        var token = await _jwtHandler.GenerateJwtAsync(user);
         var refresh = new RefreshToken
         {
             UserId = user.Id,
-            Token = GenerateRefreshToken(),
+            Token = await _jwtHandler.GenerateRefreshToken(),
             Expires = now.AddDays(7),
             CreatedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString(),
             DeviceInfo = _httpContextAccessor.HttpContext.Request.Headers["User-Agent"].ToString(),
@@ -200,13 +194,13 @@ public class IdentityService : IIdentityService
         if (!refreshToken.IsActive)
             throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.TOKEN_IS_NULL);
 
-        refreshToken.Token = GenerateRefreshToken();
+        refreshToken.Token = await _jwtHandler.GenerateRefreshToken();
         refreshToken.CreatedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
         refreshToken.Expires = now.AddDays(7);
         refreshToken.DeviceInfo = _httpContextAccessor.HttpContext.Request.Headers["User-Agent"].ToString();
         refreshToken.RemoteIpAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
 
-        var accessToken = await GenerateJwtAsync(refreshToken.User);
+        var accessToken = await _jwtHandler.GenerateJwtAsync(refreshToken.User);
         _unitOfWork.Repository<RefreshToken>().Update(refreshToken);
         await _unitOfWork.SaveChangesAsync();
         await AddBlackListTokenAsync();
@@ -335,59 +329,6 @@ public class IdentityService : IIdentityService
         return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
     
-    private async Task<string> GenerateJwtAsync(ApplicationUser user)
-    {
-        return GenerateEncryptedToken(GetSigningCredentials(), await GetClaimsAsync(user));
-    }
-    
-    private string GenerateRefreshToken()
-    {
-        var randomNumber = new byte[32];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomNumber);
-        return Convert.ToBase64String(randomNumber);
-    }
-    
-    private string GenerateEncryptedToken(SigningCredentials signingCredentials, IEnumerable<Claim> claims)
-    {
-        var now = _dateTimeService.GetCurrentDateTimeAsync();
-        var token = new JwtSecurityToken(
-            issuer: _jwtSettings.Issuer,
-            audience: _jwtSettings.Audience,
-            claims: claims,
-            expires: now.AddMinutes(_jwtSettings.DurationInMinutes),
-            signingCredentials: signingCredentials);
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var encryptedToken = tokenHandler.WriteToken(token);
-        return encryptedToken;
-    }
-    
-    private SigningCredentials GetSigningCredentials()
-    {
-        var secret = Encoding.UTF8.GetBytes(_jwtSettings.Secret!);
-        return new SigningCredentials(new SymmetricSecurityKey(secret), SecurityAlgorithms.HmacSha256);
-    }
-    
-    private async Task<IEnumerable<Claim>> GetClaimsAsync(ApplicationUser user)
-    {
-        var roles = await _userManager.GetRolesAsync(user);
-        var roleClaims = new List<Claim>();
-
-        foreach (var role in roles)
-            roleClaims.Add(new Claim("roles", role));
-
-        var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName!),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email!),
-                new Claim("userId", user.Id.ToString()),
-            }
-            .Union(roleClaims);
-
-        return claims;
-    }
-
     private async Task AddBlackListTokenAsync()
     {
         var token = await _httpContextAccessor.HttpContext.GetTokenAsync("access_token") ?? 
