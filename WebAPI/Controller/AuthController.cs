@@ -24,7 +24,7 @@ public class AuthController : BaseController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RegisterAsync(RegisterRequest request)
     {
-        var result = await _identityService.CreateUserAsync(request, Request.Headers["origin"]);
+        var result = await _identityService.CreateUserAsync(request, Request.Headers["origin"]!);
         return Ok(result);
     }
     
