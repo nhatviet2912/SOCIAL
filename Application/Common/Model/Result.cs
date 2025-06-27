@@ -7,11 +7,10 @@ public class Result<T>
 
     public bool Succeeded { get; set; }
 
-    public T Data { get; set; }
+    public T? Data { get; set; }
 
-    //public List<ValidationResult> ValidationErrors { get; set; }
 
-    public Exception Exception { get; set; }
+    public Exception? Exception { get; set; }
     
     public int Code { get; set; }
         
@@ -95,7 +94,7 @@ public class Result<T>
         };
     }
 
-    public static Result<T> Failure(T data, string message, int code)
+    public static Result<T> Failure(T? data, string message, int code)
     {
         return new Result<T>
         {
@@ -177,7 +176,7 @@ public class Result<T>
         return Task.FromResult(Failure(data));
     }
 
-    public static Task<Result<T>> FailureAsync(T data, string message, int code)
+    public static Task<Result<T>> FailureAsync(T? data, string message, int code)
     {
         return Task.FromResult(Failure(data, message, code));
     }

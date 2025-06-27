@@ -1,8 +1,11 @@
 ﻿using System.Text;
+using Application.Common.Exception;
 using Application.Common.Interfaces.Service;
+using Domain.Constants;
 using Domain.Entities.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -13,11 +16,11 @@ public static class JwtExtension
 {
     public static void AddJwtExtension(this IServiceCollection services, IConfiguration configuration)
     {
-        // services.AddDataProtection()
-        //     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(Environment.CurrentDirectory, "keys")))
-        //     .SetApplicationName("YourAppName");
         services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
         var jwtSettings = configuration.GetSection("JwtSettings").Get<JwtSettings>();
+        if (jwtSettings == null)
+            throw new CustomException(StatusCodes.Status500InternalServerError, ErrorMessageResponse.JWT_SETTINGS_NOT_CONFIGURED);
+
         services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -34,9 +37,9 @@ public static class JwtExtension
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero,
 
-                    ValidIssuer = jwtSettings?.Issuer,
-                    ValidAudience = jwtSettings?.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+                    ValidIssuer = jwtSettings.Issuer,
+                    ValidAudience = jwtSettings.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret!)),
                 };
                 o.SaveToken = true;
                 
@@ -47,7 +50,7 @@ public static class JwtExtension
                         var tokenService = context.HttpContext.RequestServices.GetRequiredService<ICacheService>();
                         var token = context.SecurityToken;
             
-                        if (await tokenService.IsBlacklistedAsync(token?.Id))
+                        if (await tokenService.IsBlacklistedAsync(token?.Id!))
                         {
                             context.Fail("Token is blacklisted");
                         }
@@ -56,8 +59,8 @@ public static class JwtExtension
             })
             .AddGoogle(options =>
             {
-                options.ClientId = configuration["Authentication:Google:ClientId"];
-                options.ClientSecret = configuration["Authentication:Google:ClientSecret"];
+                options.ClientId = configuration["Authentication:Google:ClientId"]!;
+                options.ClientSecret = configuration["Authentication:Google:ClientSecret"]!;
                 options.CallbackPath = "/api/v1/Auth/SignIn-Google-Callback";
                 options.SaveTokens = true;
     

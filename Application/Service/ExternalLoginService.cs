@@ -41,7 +41,7 @@ public class ExternalLoginService : IExternalLoginService
         var now = _dateTimeService.GetCurrentDateTimeAsync();
         var settings = new GoogleJsonWebSignature.ValidationSettings()
         {
-            Audience = new List<string>() { _configuration["Authentication:Google:ClientId"] }
+            Audience = new List<string>() { _configuration["Authentication:Google:ClientId"]! }
         };
         
         var payload = await GoogleJsonWebSignature.ValidateAsync(request.Credential, settings);
@@ -92,9 +92,9 @@ public class ExternalLoginService : IExternalLoginService
                 UserId = user.Id,
                 Token = await _jwtHandler.GenerateRefreshToken(),
                 Expires = now.AddDays(7),
-                CreatedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString(),
-                DeviceInfo = _httpContextAccessor.HttpContext.Request.Headers["User-Agent"].ToString(),
-                RemoteIpAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString()
+                CreatedByIp = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString(),
+                DeviceInfo = _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString(),
+                RemoteIpAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString()
             };
             await _unitOfWork.Repository<RefreshToken>().AddAsync(refresh);
             await _unitOfWork.SaveChangesAsync();
@@ -102,7 +102,7 @@ public class ExternalLoginService : IExternalLoginService
             var tokenResponse = new TokenResponse(token, refresh.Token, refresh.Expires);
             return await Result<TokenResponse>.SuccessAsync(tokenResponse, ResponseCode.SUCCESS, StatusCodes.Status200OK);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await _unitOfWork.RollbackTransactionAsync();
             return await Result<TokenResponse>.FailureAsync(null, ResponseCode.INTERNAL_ERROR, StatusCodes.Status500InternalServerError);
