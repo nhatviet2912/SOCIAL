@@ -86,7 +86,7 @@ public class IdentityService : IIdentityService
         
         // Send Mail
         var confirmationLink = await SendVerificationEmail(user, origin);
-        await _emailService.SendEmailAsync(user.Email, "Confirm your email",
+        await _emailService.SendEmailAsync(user.Email!, "Confirm your email",
             $"Please confirm your account by clicking this link: <a href='{confirmationLink}'>link</a>");
 
         return await Result<bool>.SuccessAsync(true, ResponseCode.SUCCESS, StatusCodes.Status200OK);
@@ -130,16 +130,16 @@ public class IdentityService : IIdentityService
         
         var password = await _userManager.CheckPasswordAsync(user, request.Password!);
         if (!password) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.PASSWORD_INVALID);
-        
+                
         var token = await _jwtHandler.GenerateJwtAsync(user);
         var refresh = new RefreshToken
         {
             UserId = user.Id,
             Token = await _jwtHandler.GenerateRefreshToken(),
             Expires = now.AddDays(7),
-            CreatedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString(),
-            DeviceInfo = _httpContextAccessor.HttpContext.Request.Headers["User-Agent"].ToString(),
-            RemoteIpAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString()
+            CreatedByIp = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString(),
+            DeviceInfo = _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString(),
+            RemoteIpAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString()
         };
         await _unitOfWork.Repository<RefreshToken>().AddAsync(refresh);
         await _unitOfWork.SaveChangesAsync();
@@ -195,10 +195,10 @@ public class IdentityService : IIdentityService
             throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.TOKEN_IS_NULL);
 
         refreshToken.Token = await _jwtHandler.GenerateRefreshToken();
-        refreshToken.CreatedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
+        refreshToken.CreatedByIp = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
         refreshToken.Expires = now.AddDays(7);
-        refreshToken.DeviceInfo = _httpContextAccessor.HttpContext.Request.Headers["User-Agent"].ToString();
-        refreshToken.RemoteIpAddress = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
+        refreshToken.DeviceInfo = _httpContextAccessor.HttpContext?.Request.Headers["User-Agent"].ToString();
+        refreshToken.RemoteIpAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 
         var accessToken = await _jwtHandler.GenerateJwtAsync(refreshToken.User);
         _unitOfWork.Repository<RefreshToken>().Update(refreshToken);
@@ -216,7 +216,7 @@ public class IdentityService : IIdentityService
 
             if (refreshToken != null && refreshToken.IsActive)
             {
-                await RevokeTokenAsync(refreshToken, _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString());
+                await RevokeTokenAsync(refreshToken, _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString());
             }
         }
 
@@ -227,12 +227,15 @@ public class IdentityService : IIdentityService
 
     public async Task<Result<bool>> LogoutAllAsync()
     {
-        var userId = _httpContextAccessor.HttpContext.User.FindFirst("userId")?.Value;
+        var userId = _httpContextAccessor.HttpContext?.User.FindFirst("userId")?.Value;
         var now = _dateTimeService.GetCurrentDateTimeAsync();
         
         var user = await _userManager.Users
             .Include(f => f.RefreshTokens)
-            .FirstOrDefaultAsync(u => u.Id == Guid.Parse(userId));
+            .FirstOrDefaultAsync(u => u.Id == Guid.Parse(userId!));
+
+        if (user == null)
+            throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
 
         await _unitOfWork.BeginTransactionAsync();
         try
@@ -240,7 +243,7 @@ public class IdentityService : IIdentityService
             foreach (var token in user.RefreshTokens.Where(t => t.IsActive))
             {
                 token.Revoked = now;
-                token.RevokedByIp = _httpContextAccessor.HttpContext.Connection.RemoteIpAddress.ToString();
+                token.RevokedByIp = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
                 _unitOfWork.Repository<RefreshToken>().Update(token);
             }
             await _unitOfWork.SaveChangesAsync();
@@ -260,9 +263,11 @@ public class IdentityService : IIdentityService
         var httpContextAccessor = _httpContextAccessor.HttpContext;
         var userId = httpContextAccessor?.User.FindFirst("userId")?.Value;
         var userAgent = httpContextAccessor?.Request.Headers["User-Agent"].ToString();
-        var ip = httpContextAccessor?.Connection.RemoteIpAddress.ToString();
+        var ip = httpContextAccessor?.Connection.RemoteIpAddress?.ToString();
         var now = _dateTimeService.GetCurrentDateTimeAsync();
         
+        if (userId == null)
+            throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
 
         var token = await _unitOfWork.Repository<RefreshToken>().FirstOrDefaultAsync(x => x.UserId == Guid.Parse(userId)
             && x.DeviceInfo == userAgent && x.IsActive);
@@ -279,7 +284,10 @@ public class IdentityService : IIdentityService
 
     public async Task<Result<List<RefreshTokenResponse>>> GetActiveDevicesAsync()
     {
-        var userId = _httpContextAccessor.HttpContext.User.FindFirst("userId")?.Value;
+        var userId = _httpContextAccessor.HttpContext?.User.FindFirst("userId")?.Value;
+        if (userId == null)
+            throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.USER_NOT_FOUND);
+
         var dataRepo = await _unitOfWork.RefreshTokenRepository.GetActiveDevicesAsync(Guid.Parse(userId));
         var result = _mapper.Map<List<RefreshTokenResponse>>(dataRepo);
         
@@ -300,7 +308,7 @@ public class IdentityService : IIdentityService
         return await Result<bool>.SuccessAsync(result.Succeeded, ResponseCode.SUCCESS, StatusCodes.Status200OK);
     }
 
-    public async Task<Result<bool>> RevokeTokenAsync(RefreshToken token, string ipAddress)
+    public async Task<Result<bool>> RevokeTokenAsync(RefreshToken token, string? ipAddress)
     {
         var now = _dateTimeService.GetCurrentDateTimeAsync();
         token.Revoked = now;
@@ -331,8 +339,8 @@ public class IdentityService : IIdentityService
     
     private async Task AddBlackListTokenAsync()
     {
-        var token = await _httpContextAccessor.HttpContext.GetTokenAsync("access_token") ?? 
-                    _httpContextAccessor.HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        var token = await _httpContextAccessor.HttpContext!.GetTokenAsync("access_token") ?? 
+                    _httpContextAccessor.HttpContext!.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
 
         if (token == null) throw new CustomException(StatusCodes.Status400BadRequest, ErrorMessageResponse.TOKEN_IS_NULL);
         

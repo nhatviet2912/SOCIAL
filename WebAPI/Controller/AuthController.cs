@@ -3,6 +3,7 @@ using Application.DTO.Request.Login;
 using Application.DTO.Request.Register;
 using Application.DTO.Request.Role;
 using Application.DTO.Request.Token;
+using Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,7 +31,7 @@ public class AuthController : BaseController
     [HttpGet("GetAllUsers")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "AdminManager")]
+    [Authorize(Policy = Policies.AdminManager)]
     public async Task<IActionResult> GetAllUsersAsync()
     {
         var result = await _identityService.GetAllUsersAsync();
@@ -49,7 +50,7 @@ public class AuthController : BaseController
     [HttpPost("CreateRole")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "AdminManager")]
+    [Authorize(Policy = Policies.AdminManager)]
     public async Task<IActionResult> CreateRoleAsync(RoleRequest request)
     {
         var result = await _identityService.CreateRoleAsync(request);
@@ -59,7 +60,7 @@ public class AuthController : BaseController
     [HttpPost("AssignRoles")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [Authorize(Policy = "AdminManager")]
+    [Authorize(Policy = Policies.AdminManager)]
     public async Task<IActionResult> AssignRolesAsync(AssignRoleRequest request)
     {
         var result = await _identityService.AssignRolesAsync(request);

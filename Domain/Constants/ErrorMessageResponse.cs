@@ -18,4 +18,5 @@ public static class ErrorMessageResponse
     public const string TOKEN_IS_NULL = "Token is null";
     public const string EMAIL_NOT_CONFIRMED = "Email not confirmed";
     public const string INVALID_EXTERNAL = "Invalid External Authentication";
+    public const string JWT_SETTINGS_NOT_CONFIGURED = "JwtSettings or Secret is not configured properly.";
 }
